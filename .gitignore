@@ -1,0 +1,24 @@
+# 凭据与运行时状态 —— 绝对不要提交
+config.json
+*.token
+*.token.bak
+.mi_token*
+.mi_token.json
+.mi_otp
+.mi_status
+.mi_deviceid
+.mi_devices.json
+.mi_login.log
+
+# 数据
+memory.db
+*.db
+bridge.log
+bridge.state.json
+*.out
+audio/
+certs/
+__pycache__/
+*.pyc
+.venv/
+venv/

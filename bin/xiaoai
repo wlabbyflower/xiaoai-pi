@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+# 小爱音箱 × pi 的命令行入口（调本机 HTTP API）
+#
+#   xiaoai say "让它念这句话"
+#   xiaoai ask "问一个问题"                 # 需要实时信息会自动联网查
+#   xiaoai ask "继续追问" --session work    # 同 session = 连续对话
+#   xiaoai status
+#   xiaoai stop                             # 打断播报
+set -euo pipefail
+
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+read_cfg() {
+  python3 - "$HERE/config.json" "$1" <<'PY'
+import json, sys
+path, key = sys.argv[1], sys.argv[2]
+defaults = {'http_host': '127.0.0.1', 'http_port': 8447, 'dlna_ip': ''}
+try:
+    with open(path) as f:
+        cfg = json.load(f)
+except Exception:
+    cfg = {}
+val = cfg.get(key) or defaults.get(key, '')
+print(val)
+PY
+}
+
+HOST="$(read_cfg http_host)"
+PORT="$(read_cfg http_port)"
+DLNA_IP="$(read_cfg dlna_ip)"
+[ "$HOST" = "0.0.0.0" ] && HOST="127.0.0.1"
+API="${XIAOAI_API:-http://${HOST}:${PORT}}"
+
+json_str() { python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))'; }
+
+SOAP() {
+  [ -n "$DLNA_IP" ] || { echo "config.json 里没有 dlna_ip，先跑 discover.py" >&2; exit 1; }
+  curl -s --max-time 6 -X POST "http://${DLNA_IP}:9999/AVTransport/control" \
+    -H 'Content-Type: text/xml; charset="utf-8"' \
+    -H "SOAPACTION: \"urn:schemas-upnp-org:service:AVTransport:1#$1\"" \
+    --data-binary "<?xml version=\"1.0\"?><s:Envelope xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\" s:encodingStyle=\"http://schemas.xmlsoap.org/soap/encoding/\"><s:Body><u:$1 xmlns:u=\"urn:schemas-upnp-org:service:AVTransport:1\"><InstanceID>0</InstanceID><Speed>1</Speed></u:$1></s:Body></s:Envelope>" >/dev/null
+}
+
+case "${1:-help}" in
+  say)
+    shift
+    [ $# -gt 0 ] || { echo "用法: xiaoai say \"要说的话\"" >&2; exit 2; }
+    body=$(printf '{"text": %s}' "$(printf '%s' "$*" | json_str)")
+    curl -s --max-time 60 -X POST "$API/say" -H 'Content-Type: application/json' -d "$body"
+    echo
+    ;;
+  ask)
+    shift
+    [ $# -gt 0 ] || { echo "用法: xiaoai ask \"你的问题\" [--session 名字]" >&2; exit 2; }
+    text="$1"; session="${3:-xiaoai-speaker}"
+    body=$(printf '{"text": %s, "session": %s}' \
+      "$(printf '%s' "$text" | json_str)" "$(printf '%s' "$session" | json_str)")
+    curl -s --max-time 300 -X POST "$API/ask" -H 'Content-Type: application/json' -d "$body"
+    echo
+    ;;
+  stop)
+    SOAP Stop
+    echo "已发送停止指令"
+    ;;
+  status)
+    curl -s --max-time 10 "$API/status"
+    echo
+    ;;
+  *)
+    sed -n '2,9p' "$0" | sed 's/^# \{0,1\}//'
+    ;;
+esac

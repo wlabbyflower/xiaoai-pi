@@ -1,0 +1,22 @@
+{
+  "mi_user": "你的小米账号（手机号或邮箱）",
+  "mi_pass": "密码",
+  "device_name": "",
+  "device_id": "",
+  "device_did": "",
+  "hardware": "",
+  "dlna_ip": "",
+  "dlna_port": 9999,
+  "pi_bin": "pi",
+  "pi_cwd": "~",
+  "http_host": "127.0.0.1",
+  "http_port": 8447,
+  "https_port": 0,
+  "whisper_model": "small",
+  "whisper_lang": "zh",
+  "tts_voice": "zh-CN-XiaoxiaoNeural",
+  "speak_mode": "auto",
+  "memory_auto": true,
+  "session_ttl": 600,
+  "peer_turns": 6
+}

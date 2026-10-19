@@ -1,0 +1,14 @@
+[Unit]
+Description=XiaoAi speaker <-> pi agent voice bridge
+After=network-online.target xiaoai-api.service
+
+[Service]
+Type=simple
+WorkingDirectory=%h/xiaoai-pi
+ExecStart=/usr/bin/env python3 %h/xiaoai-pi/pi_bridge.py
+Environment=PYTHONUNBUFFERED=1
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

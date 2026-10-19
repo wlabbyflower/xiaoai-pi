@@ -1,0 +1,7 @@
+# 小米云 API / 账号登录（必需）
+miservice>=3.0.0
+# 本地语音识别（可选：不用麦克风输入可以删掉）
+faster-whisper>=1.0.0
+numpy>=1.24
+# 本地 TTS（DLNA 播报必需）
+edge-tts>=6.1.0

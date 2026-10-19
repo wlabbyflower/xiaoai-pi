@@ -1,0 +1,14 @@
+[Unit]
+Description=XiaoAi speaker <-> pi agent HTTP API
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/xiaoai-pi
+ExecStart=/usr/bin/env python3 %h/xiaoai-pi/pi_api.py
+Environment=PYTHONUNBUFFERED=1
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target
