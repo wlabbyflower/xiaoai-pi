@@ -163,7 +163,9 @@ TALK_PAGE = """<!doctype html><meta charset="utf-8">
 </style>
 <h2>连续对话</h2>
 <div class="m">点一次开始，之后它会自动听、答、说完再听。它问你就直接答。</div>
-<p><label>会话 <input id=s value="talk"></label></p>
+<p><label>会话 <input id=s value="talk"></label>
+<label style="margin-left:14px"><input type="checkbox" id=needwake checked> 需要唤醒词</label></p>
+<div class="m">说「小P」唤醒；唤醒后 2 分钟内可以直接连续对话，不用重复喊。</div>
 <button id=big onclick="toggle()">▶ 开始对话</button>
 <div id=state>待机</div>
 <div id=log></div>
@@ -173,6 +175,23 @@ const $=id=>document.getElementById(id);
 const log=(c,t)=>{const d=document.createElement('div');d.className=c;d.textContent=t;$('log').prepend(d)};
 const setState=t=>{$('state').textContent=t};
 let running=false, stream=null, ac=null, analyser=null, data=null;
+let awakeUntil=0;                       // 唤醒有效期（毫秒时间戳）
+const WAKE_WORDS=['小p','小派','小屁','小批','小辟','小佩','小配','小呸'];
+const WAKE_TTL=120000;                  // 唤醒后 2 分钟内免唤醒
+
+function findWake(text){
+  const s=text.toLowerCase().replace(/[\\s，。,.!?！？、]/g,'');
+  for(const w of WAKE_WORDS){ const i=s.indexOf(w); if(i>=0) return w; }
+  return null;
+}
+function stripWake(text){
+  let t=text;
+  for(const w of WAKE_WORDS){
+    const re=new RegExp(w,'ig');
+    t=t.replace(re,'');
+  }
+  return t.replace(/^[\\s，。,.!?！？、]+/,'').trim();
+}
 
 async function toggle(){
   if(running){ stopAll(); return; }
@@ -266,13 +285,34 @@ async function waitSpoken(){
 
 async function loop(){
   while(running){
-    setState('👂 在听…（直接说话就行）');
+    setState(Date.now() > awakeUntil && document.getElementById('needwake').checked
+      ? '😴 在听…（先说「小P」）' : '👂 在听…（直接说就行）');
     const blob=await recordUtterance();
     if(!running) break;
     if(!blob){ continue; }
     setState('📝 识别中…');
-    const text=await stt(blob);
+    let text=await stt(blob);
     if(!text){ setState('没听清，再说一次'); continue; }
+
+    const needWake = document.getElementById('needwake').checked;
+    if(needWake){
+      const woken = findWake(text);
+      if(woken){
+        awakeUntil = Date.now() + WAKE_TTL;
+        text = stripWake(text);
+        log('m','🔔 唤醒词命中，进入对话态（2 分钟内免唤醒）');
+        if(!text){
+          // 只喊了唤醒词，等下一句
+          setState('🔔 我在，说吧');
+          continue;
+        }
+      }else if(Date.now() > awakeUntil){
+        log('m','😴 未唤醒，忽略：'+text);
+        setState('😴 待唤醒：先说「小P」');
+        continue;
+      }
+    }
+
     log('q','你：'+text);
     setState('🤔 想…');
     let j;

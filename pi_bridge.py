@@ -290,10 +290,33 @@ def ask_pi(question: str, session_id: str, extra_system: str = '',
         return ''
 
 
+_cloud_gen = 0
+_cloud_gen_lock = threading.Lock()
+
+
+async def _stop_cloud_later(seconds: float, generation: int) -> None:
+    """云端 TTS 同样受「单曲循环」影响，播完必须主动停，否则一句话念到天亮。"""
+    await asyncio.sleep(seconds)
+    with _cloud_gen_lock:
+        if generation != _cloud_gen:
+            return
+    try:
+        acc = await get_account()
+        await MiNAService(acc).player_stop(DEVICE_ID)
+        log('[speak] 云端播放已停止（防循环）')
+    except Exception as e:  # noqa: BLE001
+        log(f'[speak] 云端停播失败: {e}')
+
+
 async def _speak_cloud(text: str) -> bool:
+    global _cloud_gen
     try:
         acc = await get_account()
         await MiNAService(acc).text_to_speech(DEVICE_ID, text)
+        with _cloud_gen_lock:
+            _cloud_gen += 1
+            gen = _cloud_gen
+        asyncio.create_task(_stop_cloud_later(len(text) / 4.2 + 3.0, gen))
         return True
     except Exception as e:  # noqa: BLE001 - 云端失败交给上层决定是否回退
         log(f'云端 TTS 失败: {e}')
